@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NTT DATA — RR Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+:root{
+  --primary:#003087;--primary-light:#e8eef8;--accent:#e8242a;--accent-soft:#fdeaea;
+  --green:#00875a;--green-soft:#e3f5ee;--amber:#c97a00;--amber-soft:#fff4e0;
+  --red:#c0392b;--red-soft:#fdeaea;--purple:#7c3aed;--purple-soft:#f3f0ff;
+  --surface:#fff;--bg:#f5f7fb;--border:#dde3ee;
+  --text:#0d1b3e;--text-secondary:#556080;--text-muted:#8a96b4;
+  --radius:10px;--shadow:0 2px 12px rgba(0,48,135,.07);--shadow-lg:0 8px 32px rgba(0,48,135,.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:56px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.18)}
+.topbar-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+.topbar-logo{width:28px;height:28px;background:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center}
+.topbar-sub{font-size:11px;font-weight:400;opacity:.65;margin-left:2px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.conn-pill{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:4px 12px;font-size:12px;display:flex;align-items:center;gap:7px;color:#fff}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#f87171;transition:background .4s}
+.dot.ok{background:#4ade80}
+.dot.loading{background:#fbbf24;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn-top{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;border-radius:7px;padding:7px 14px;font-size:13px;cursor:pointer;font-family:inherit;transition:background .15s;display:flex;align-items:center;gap:6px}
+.btn-top:hover{background:rgba(255,255,255,.22)}
+.btn-top.white{background:#fff;color:var(--primary);border-color:#fff;font-weight:600}
+.btn-top.white:hover{background:#e8eef8}
+
+/* ── TABS ── */
+.tab-nav{background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 28px}
+.tab-btn{padding:14px 22px;border:none;background:none;font-family:inherit;font-size:13.5px;font-weight:500;color:var(--text-secondary);cursor:pointer;position:relative;transition:color .15s;display:flex;align-items:center;gap:7px}
+.tab-btn::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2.5px;background:var(--primary);border-radius:2px 2px 0 0;transform:scaleX(0);transition:transform .2s}
+.tab-btn.active{color:var(--primary)}
+.tab-btn.active::after{transform:scaleX(1)}
+.tab-btn:hover{color:var(--primary)}
+.badge{background:var(--primary-light);color:var(--primary);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;font-family:'DM Mono',monospace}
+
+/* ── LAYOUT ── */
+.main{padding:28px;max-width:1400px;margin:0 auto}
+.view{display:none}
+.view.active{display:block}
+
+/* ── LOADING OVERLAY ── */
+.loader{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.loader.show{display:flex}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-txt{font-size:14px;color:var(--text-secondary);font-weight:500}
+
+/* ── CONFIG BANNER ── */
+.config-banner{background:linear-gradient(90deg,#7c3aed,#4f46e5);color:#fff;padding:12px 28px;display:flex;align-items:center;gap:12px;font-size:13px}
+.config-banner a{color:#c4b5fd;text-decoration:underline;cursor:pointer}
+.config-banner code{background:rgba(255,255,255,.15);padding:2px 7px;border-radius:4px;font-family:'DM Mono',monospace;font-size:12px}
+
+/* ── CARDS ── */
+.form-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
+.form-title{font-size:20px;font-weight:700}
+.form-sub{font-size:13px;color:var(--text-secondary);margin-top:3px}
+.card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+.card-head{padding:14px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--bg)}
+.card-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.ci-blue{background:var(--primary-light)}.ci-amber{background:var(--amber-soft)}.ci-green{background:var(--green-soft)}.ci-purple{background:var(--purple-soft)}
+.card-title{font-size:13.5px;font-weight:600}
+.card-body{padding:22px}
+
+/* ── FORM GRID ── */
+.g{display:grid;gap:18px 22px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+.field{display:flex;flex-direction:column;gap:5px}
+.full{grid-column:1/-1}.s2{grid-column:span 2}
+label{font-size:11.5px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em}
+.req{color:var(--accent);margin-left:2px}
+input,select,textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;font-family:inherit;font-size:13.5px;color:var(--text);background:#fff;transition:border-color .15s,box-shadow .15s;outline:none;appearance:none}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23556080' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;cursor:pointer}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,48,135,.08)}
+input.err,select.err{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,36,42,.08)}
+textarea{resize:vertical;min-height:72px}
+.hint{font-size:11px;color:var(--text-muted);line-height:1.4}
+.errmsg{font-size:11px;color:var(--accent);display:none;margin-top:2px}
+.field.bad .errmsg{display:block}
+.cond{transition:opacity .2s}
+.cond.hidden{opacity:.3;pointer-events:none}
+
+/* ── PIPELINE ── */
+.pipe{display:grid;grid-template-columns:repeat(8,1fr);gap:12px}
+.ps{display:flex;flex-direction:column;gap:5px}
+.ps label{font-size:10px;text-align:center}
+.ps input{text-align:center;font-family:'DM Mono',monospace}
+
+/* ── BUTTONS ── */
+.form-foot{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:18px 22px;border-top:1px solid var(--border);background:var(--bg)}
+.btn{padding:9px 22px;border-radius:7px;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:flex;align-items:center;gap:7px}
+.btn-sec{background:var(--surface);border:1.5px solid var(--border);color:var(--text-secondary)}
+.btn-sec:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.btn-pri{background:var(--primary);color:#fff}
+.btn-pri:hover{background:#002070}
+
+/* ── STATS ── */
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)}
+.si{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sn{font-size:22px;font-weight:700;font-family:'DM Mono',monospace}
+.sl{font-size:11px;color:var(--text-secondary);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+
+/* ── TABLE ── */
+.tbl-ctrl{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:14px;flex-wrap:wrap}
+.search-box{position:relative}
+.search-box input{padding:9px 12px 9px 36px;width:280px;background:var(--surface)}
+.si-ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-muted)}
+.flt-row{display:flex;gap:10px;flex-wrap:wrap}
+.flt{padding:8px 12px;border:1.5px solid var(--border);border-radius:7px;font-family:inherit;font-size:13px;color:var(--text);background:var(--surface);cursor:pointer}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:13px}
+thead tr{background:var(--bg)}
+th{padding:11px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s}
+tbody tr:hover{background:var(--primary-light)}
+.rag-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;font-family:'DM Mono',monospace}
+.r-RED{background:var(--red-soft);color:var(--red)}.r-AMBER{background:var(--amber-soft);color:var(--amber)}.r-GREEN{background:var(--green-soft);color:var(--green)}
+.rdot{width:7px;height:7px;border-radius:50%}
+.r-RED .rdot{background:var(--red)}.r-AMBER .rdot{background:var(--amber)}.r-GREEN .rdot{background:var(--green)}
+.sb{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.sOpen{background:#eef2ff;color:#3730a3}.sClosed{background:var(--green-soft);color:var(--green)}
+.sOnhold{background:var(--amber-soft);color:var(--amber)}.sLost{background:var(--red-soft);color:var(--red)}.sCancelled{background:#f3f4f6;color:#6b7280}
+.rr-num{font-family:'DM Mono',monospace;font-size:12px;color:var(--primary);font-weight:500}
+.act-btns{display:flex;gap:6px}
+.ico-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.ico-btn:hover{background:var(--primary);border-color:var(--primary);color:#fff}
+.ico-btn.del:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+.empty-st{text-align:center;padding:60px 20px;color:var(--text-muted)}
+.empty-st h3{font-size:16px;color:var(--text-secondary);margin-bottom:6px}
+
+/* ── LAST UPDATED ── */
+.live-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);padding:5px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border)}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,62,.45);z-index:500;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:12px;box-shadow:var(--shadow-lg);width:100%;max-width:460px}
+.modal-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:16px;font-weight:700}
+.modal-close{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;font-size:18px;color:var(--text-secondary);display:flex;align-items:center;justify-content:center}
+.modal-close:hover{background:var(--bg)}
+.modal-body{padding:24px}
+.modal-foot{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.cfg-field{margin-bottom:16px}
+.cfg-field label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+.cfg-field input{font-family:'DM Mono',monospace;font-size:12px}
+.cfg-note{font-size:12px;color:var(--text-muted);background:var(--bg);border-radius:6px;padding:10px 12px;line-height:1.5;border:1px solid var(--border)}
+
+/* ── TOAST ── */
+.toast-wrap{position:fixed;top:70px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.toast{background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:13px;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:9px;animation:tsin .25s ease;pointer-events:auto;max-width:340px}
+.toast.success{background:var(--green)}.toast.error{background:var(--accent)}.toast.info{background:var(--primary)}.toast.warn{background:var(--amber)}
+@keyframes tsin{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){.main{padding:16px}.stats-bar{grid-template-columns:repeat(2,1fr)}.g3,.g4{grid-template-columns:repeat(2,1fr)}.pipe{grid-template-columns:repeat(4,1fr)}.search-box input{width:200px}}
+@media(max-width:600px){.stats-bar{grid-template-columns:1fr}.g,.g2,.g3,.g4{grid-template-columns:1fr}.pipe{grid-template-columns:repeat(2,1fr)}.tab-btn{padding:12px 14px;font-size:12.5px}}
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div class="loader" id="loader"><div class="spinner"></div><div class="loader-txt" id="loaderTxt">Connecting to database…</div></div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo"><svg viewBox="0 0 18 18" fill="none" width="18" height="18"><rect width="18" height="18" rx="3" fill="#003087"/><rect x="3" y="7" width="5" height="8" rx="1" fill="#fff"/><rect x="10" y="3" width="5" height="12" rx="1" fill="#e8242a"/></svg></div>
+    <span>NTT DATA <span class="topbar-sub">RR Tracker · IPS Europe</span></span>
+  </div>
+  <div class="topbar-right">
+    <div class="conn-pill"><span class="dot loading" id="connDot"></span><span id="connLabel">Connecting…</span></div>
+    <button class="btn-top" onclick="openCfgModal()" title="Configure Supabase connection">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+      Configure DB
+    </button>
+    <button class="btn-top white" onclick="exportExcel()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export Excel
+    </button>
+  </div>
+</div>
+
+<!-- CONFIG BANNER (shown when using placeholder credentials) -->
+<div class="config-banner" id="cfgBanner" style="display:none">
+  ⚙️ &nbsp;Using <strong>placeholder</strong> Supabase credentials. Click <a onclick="openCfgModal()">Configure DB</a> to enter your real project URL and anon key, or edit the <code>SUPABASE_URL</code> / <code>SUPABASE_KEY</code> constants in the source.
+</div>
+
+<!-- TABS -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('new')" id="tab-new">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    New Requirement
+  </button>
+  <button class="tab-btn" onclick="switchTab('records')" id="tab-records">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+    All Records <span class="badge" id="recCount">0</span>
+  </button>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- ══ NEW RR VIEW ══ -->
+  <div class="view active" id="view-new">
+    <div class="form-hdr">
+      <div><div class="form-title" id="formTitle">New Resource Requirement</div><div class="form-sub" id="formSub">Fields marked <span style="color:var(--accent)">*</span> are required</div></div>
+      <button class="btn btn-sec" onclick="resetForm()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 101.5-5"/><polyline points="3 3 3 8 8 8"/></svg> Reset
+      </button>
+    </div>
+
+    <!-- 1. Org Context -->
+    <div class="card">
+      <div class="card-head"><div class="card-icon ci-blue">🏢</div><div class="card-title">Organisational Context</div></div>
+      <div class="card-body"><div class="g g4">
+        <div class="field"><label>Region<span class="req">*</span></label>
+          <select id="region" onchange="fv(this)"><option value="">Select…</option><option>UK&I</option><option>Germany</option><option>Spain</option><option>Singapore</option></select><span class="errmsg">Required</span></div>
+        <div class="field"><label>Sector Head<span class="req">*</span></label>
+          <select id="sectorHead" onchange="fv(this)"><option value="">Select…</option><option>Shrinidhi Kumar</option><option>Pradip Bhuyan</option><option>Sathya Prasad</option><option>Somasundaram</option><option>Harish C</option><option>Ramana</option><option>Sundar</option><option>Vanathi</option></select><span class="errmsg">Required</span></div>
+        <div class="field"><label>Global Practice</label>
+          <select id="globalPractice"><option value="">Select…</option><option>ABD</option><option>Consulting</option></select></div>
+        <div class="field"><label>Service Line<span class="req">*</span></label>
+          <select id="serviceLine" onchange="fv(this)"><option value="">Select…</option><option>APPS-Engg</option><option>DATA</option><option>APPS -COE</option><option>APPS-QAE</option><option>APPS-PMO</option><option>Consulting</option></select>
+          <span class="errmsg">Required</span><span class="hint">Oracle/Atlassian/Guidewire/Dynamics/Outsystems → APPS-COE</span></div>
+        <div class="field"><label>Vertical<span class="req">*</span></label>
+          <select id="vertical" onchange="fv(this)"><option value="">Select…</option><option>Banking</option><option>Insurance</option><option>TMT</option><option>Public Sector</option><option>Products &amp; Services</option><option>Automotive</option><option>PMO</option></select><span class="errmsg">Required</span></div>
+        <div class="field"><label>Delivery Director</label><input type="text" id="deliveryDirector" placeholder="e.g. Ramesh K"></div>
+        <div class="field"><label>Delivery Manager</label><input type="text" id="deliveryManager" placeholder="e.g. Devokie"></div>
+        <div class="field"><label>Hiring Manager</label><input type="text" id="hiringManager" placeholder="e.g. Sanjay Kumar">
+          <span class="hint">DATA→Sanjay Kumar; APPS-COE→respective practice manager</span></div>
+      </div></div>
+    </div>
+
+    <!-- 2. Requirement Details -->
+    <div class="card">
+      <div class="card-head"><div class="card-icon ci-blue">📋</div><div class="card-title">Requirement Details</div></div>
+      <div class="card-body"><div class="g g4">
+        <div class="field"><label>Account<span class="req">*</span></label><input type="text" id="account" placeholder="e.g. ICBCS" onblur="fv(this)"><span class="errmsg">Required</span></div>
+        <div class="field"><label>Project</label><input type="text" id="project" placeholder="e.g. L2 Calypso"></div>
+        <div class="field"><label>Kimble ID</label><input type="text" id="kimbleId" placeholder="e.g. E010860"><span class="hint">Applicable to UK&amp;I</span></div>
+        <div class="field"><label>RR #<span class="req">*</span></label><input type="text" id="rrNum" placeholder="e.g. 367716" onblur="fv(this)"><span class="errmsg">Required</span></div>
+        <div class="field"><label>Request Type<span class="req">*</span></label>
+          <select id="requestType" onchange="fv(this)"><option value="">Select…</option><option>New Requirement</option><option>Replacement</option></select><span class="errmsg">Required</span></div>
+        <div class="field"><label>Back-up RR / RFP</label>
+          <select id="backupRR"><option value="">Select…</option><option>Yes</option><option>No</option><option>RFP</option></select></div>
+        <div class="field"><label>Primary Skill Set<span class="req">*</span></label>
+          <select id="primarySkill" onchange="fv(this)"><option value="">Select…</option>
+            <option>.Net</option><option>AI</option><option>Angular</option><option>Appian</option><option>Architect</option><option>AS400</option><option>Atlassian</option><option>Automation QA</option><option>Automation, Storage &amp; Backup</option><option>AWS</option><option>BA</option><option>BI</option><option>C#</option><option>Calypso</option><option>Cloud Native</option><option>Communication Platform Support</option><option>Data</option><option>DATA</option><option>Data Archival Designer</option><option>Data Engineer</option><option>Data Engineering &amp; Visualization</option><option>Devops</option><option>Engineering Manager</option><option>ETL Testing</option><option>Full Stack</option><option>Grafana Cloud Expert</option><option>GuideWire</option><option>IT Application Operations Service Analyst</option><option>Java</option><option>jBPM tech lead</option><option>Lead Java Developer</option><option>Lead React Developer</option><option>Mainframe</option><option>Oracle</option><option>Outsystem</option><option>PMO</option><option>Power BI</option><option>Project Manager</option><option>Python Automation QA</option><option>Risk and control tester</option><option>Saleforce</option><option>Scrum Master</option><option>Senior Flutter Developer</option><option>Snowflake</option><option>Solution Architect</option><option>Specialist - Risk &amp; Control</option><option>SQL</option><option>Tester</option><option>UX/UI</option>
+          </select><span class="errmsg">Required</span></div>
+        <div class="field"><label>Seniority Level<span class="req">*</span></label>
+          <select id="seniorityLevel" onchange="fv(this)"><option value="">Select…</option><option>Junior</option><option>Mid</option><option>Senior</option></select><span class="errmsg">Required</span></div>
+        <div class="field s2"><label>Skill Set Combination</label><input type="text" id="skillCombo" placeholder="e.g. AWS, Python, Terraform, Apache"></div>
+        <div class="field s2"><label>Role Description<span class="req">*</span></label><input type="text" id="roleDesc" placeholder="e.g. Data Engineer" onblur="fv(this)"><span class="errmsg">Required</span></div>
+        <div class="field"><label>Contract Type</label><select id="contractType"><option value="">Select…</option><option>Staffing</option><option>Managed Services</option></select></div>
+        <div class="field"><label>Working Hours</label><input type="text" id="workingHours" placeholder="e.g. UK Shift, Regular, 24x7"></div>
+        <div class="field"><label>Max Grade Allowed</label><input type="text" id="maxGrade" placeholder="e.g. G10, G11/G12"></div>
+        <div class="field"><label>TA / VMG / RPO Contact</label><input type="text" id="taContact" placeholder="e.g. Vertika, Abhilash"></div>
+      </div></div>
+    </div>
+
+    <!-- 3. Dates & Status -->
+    <div class="card">
+      <div class="card-head"><div class="card-icon ci-amber">📅</div><div class="card-title">Dates &amp; Status</div></div>
+      <div class="card-body">
+        <div class="g g4">
+          <div class="field"><label>Request Received Date<span class="req">*</span></label><input type="date" id="reqRecDate" onchange="fv(this)"><span class="errmsg">Required</span></div>
+          <div class="field"><label>Client Billing Start / Kimble Date</label><input type="date" id="clientBilling"></div>
+          <div class="field"><label>Agreed Billing Start Date</label><input type="date" id="agreedBilling"></div>
+          <div class="field"><label>Lead Time Provided<span class="req">*</span></label>
+            <select id="leadTime" onchange="fv(this)"><option value="">Select…</option><option>Yes</option><option>No</option><option>Agreed</option></select><span class="errmsg">Required</span></div>
+          <div class="field"><label>Status<span class="req">*</span></label>
+            <select id="status" onchange="fv(this);toggleDates()"><option value="">Select…</option><option>Open</option><option>Closed</option><option>On-hold</option><option>Lost</option><option>Cancelled</option></select><span class="errmsg">Required</span></div>
+          <div class="field"><label>Status – Progress</label>
+            <select id="statusProg"><option value="">Select…</option>
+              <option>Open - Offer Released</option><option>Open - Client Slot Awaited</option><option>Open - Profiles shared</option><option>Open - Candidate Identified</option><option>Open - Offer Accepted</option><option>Open - Awaiting Onboarding Date</option><option>Open - Interviews in progress</option><option>Open - Awaiting Interview Feedback</option><option>Open - Awaiting Profiles</option><option>Closed</option><option>Onhold - Client Delays/No Feedback</option><option>Onhold - Awaiting Role Confirmation</option><option>Onhold - To be onboarded at later date</option><option>Lost</option><option>Cancelled</option>
+            </select></div>
+          <div class="field"><label>Fulfilled By</label><select id="fulfilledBy"><option value="">Select…</option><option>Internal</option><option>External</option></select></div>
+          <div class="field"><label>Tagged To</label><input type="text" id="taggedTo" placeholder="e.g. TA, VMG, RPO"></div>
+          <div class="field cond hidden" id="w-closed"><label>Closed Date</label><input type="date" id="closedDate"><span class="hint">Date resource was onboarded</span></div>
+          <div class="field cond hidden" id="w-hold"><label>On Hold Date</label><input type="date" id="onHoldDate"></div>
+          <div class="field cond hidden" id="w-cancel"><label>Cancelled Date</label><input type="date" id="cancelledDate"></div>
+          <div class="field cond hidden" id="w-lost"><label>Lost Date</label><input type="date" id="lostDate"></div>
+          <div class="field"><label>Original Target Closure Date</label><input type="date" id="targetDate"></div>
+        </div>
+        <div style="margin-top:18px" class="g g2">
+          <div class="field"><label>On Hold – Remarks</label><textarea id="onHoldRemarks" placeholder="Reason / details for hold…"></textarea></div>
+          <div class="field"><label>General Remarks</label><textarea id="remarks" placeholder="Any additional notes…"></textarea></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Pipeline -->
+    <div class="card">
+      <div class="card-head"><div class="card-icon ci-green">📊</div><div class="card-title">Candidate Pipeline Metrics</div></div>
+      <div class="card-body">
+        <div class="pipe">
+          <div class="ps"><label>Profiles<br>Received</label><input type="number" id="pRecv" min="0" placeholder="0"></div>
+          <div class="ps"><label>Profiles<br>Shortlisted</label><input type="number" id="pShort" min="0" placeholder="0"></div>
+          <div class="ps"><label>L1<br>Selects</label><input type="number" id="l1Sel" min="0" placeholder="0"></div>
+          <div class="ps"><label>L1<br>Pending</label><input type="number" id="l1Pend" min="0" placeholder="0"></div>
+          <div class="ps"><label>L2 Screening<br>Shortlist</label><input type="number" id="l2Scr" min="0" placeholder="0"></div>
+          <div class="ps"><label>L2<br>Selects</label><input type="number" id="l2Sel" min="0" placeholder="0"></div>
+          <div class="ps"><label>L2<br>Pending</label><input type="number" id="l2Pend" min="0" placeholder="0"></div>
+          <div class="ps"><label>Client<br>Selects</label><input type="number" id="clSel" min="0" placeholder="0"></div>
+        </div>
+      </div>
+      <div class="form-foot">
+        <button class="btn btn-sec" onclick="resetForm()">Cancel</button>
+        <button class="btn btn-pri" id="btnSaveRec" onclick="saveRecord()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Save Record
+        </button>
+      </div>
+    </div>
+  </div><!-- /view-new -->
+
+  <!-- ══ ALL RECORDS VIEW ══ -->
+  <div class="view" id="view-records">
+    <div class="stats-bar">
+      <div class="stat"><div class="si" style="background:#eef2ff">📝</div><div><div class="sn" id="st0">0</div><div class="sl">Total RRs</div></div></div>
+      <div class="stat"><div class="si" style="background:#eef2ff">🔵</div><div><div class="sn" id="st1">0</div><div class="sl">Open</div></div></div>
+      <div class="stat"><div class="si" style="background:var(--amber-soft)">🟡</div><div><div class="sn" id="st2">0</div><div class="sl">On-hold</div></div></div>
+      <div class="stat"><div class="si" style="background:var(--green-soft)">✅</div><div><div class="sn" id="st3">0</div><div class="sl">Closed</div></div></div>
+      <div class="stat"><div class="si" style="background:var(--red-soft)">🔴</div><div><div class="sn" id="st4">0</div><div class="sl">RAG: RED</div></div></div>
+    </div>
+
+    <div class="tbl-ctrl">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div class="search-box">
+          <span class="si-ico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+          <input type="text" id="srch" placeholder="Search RR#, account, role…" oninput="renderTable()">
+        </div>
+        <div class="flt-row">
+          <select class="flt" id="fSt" onchange="renderTable()"><option value="">All Status</option><option>Open</option><option>Closed</option><option>On-hold</option><option>Lost</option><option>Cancelled</option></select>
+          <select class="flt" id="fRg" onchange="renderTable()"><option value="">All Regions</option><option>UK&I</option><option>Germany</option><option>Spain</option><option>Singapore</option></select>
+          <select class="flt" id="fVt" onchange="renderTable()"><option value="">All Verticals</option><option>Banking</option><option>Insurance</option><option>TMT</option><option>Public Sector</option><option>Products &amp; Services</option><option>Automotive</option><option>PMO</option></select>
+          <select class="flt" id="fRag" onchange="renderTable()"><option value="">All RAG</option><option>RED</option><option>AMBER</option><option>GREEN</option></select>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="live-badge"><span class="live-dot"></span><span id="lastRefresh">—</span></div>
+        <button class="btn btn-sec" onclick="loadRecords()" style="padding:8px 16px;font-size:13px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 101.5-5"/><polyline points="3 3 3 8 8 8"/></svg> Refresh
+        </button>
+        <button class="btn btn-pri" onclick="resetForm();switchTab('new')" style="padding:8px 16px;font-size:13px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New RR
+        </button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="tbl-wrap">
+        <table id="tbl">
+          <thead><tr>
+            <th>RR #</th><th>Account</th><th>Role</th><th>Skill</th><th>Level</th><th>Region</th><th>Vertical</th><th>Status</th><th>Progress</th><th>RAG</th><th>Ageing</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tblBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-st" id="emptyPl"><div style="font-size:40px;margin-bottom:12px">📭</div><h3>No records found</h3><p>Create a new RR or adjust your filters.</p></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- CONFIG MODAL -->
+<div class="modal-overlay" id="cfgModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">🔌 Supabase Configuration</div>
+      <button class="modal-close" onclick="closeCfgModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="cfg-note" style="margin-bottom:18px">
+        Find these values in your Supabase project under<br>
+        <strong>Settings → API → Project URL &amp; Project API Keys (anon/public)</strong>
+      </div>
+      <div class="cfg-field"><label>Project URL</label><input type="text" id="cfgUrl" placeholder="https://xxxxxxxxxxxx.supabase.co"></div>
+      <div class="cfg-field"><label>Anon / Public Key</label><input type="text" id="cfgKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"></div>
+      <div class="cfg-note">
+        After saving, the app will reconnect automatically. Settings are stored in your browser only.<br><br>
+        <strong>Also run this SQL</strong> in your Supabase SQL editor to create the table:
+        <pre style="margin-top:8px;font-size:11px;background:#1e1e2e;color:#cdd6f4;padding:10px;border-radius:6px;overflow-x:auto;line-height:1.5">CREATE TABLE rr_tracker (
+  id            BIGSERIAL PRIMARY KEY,
+  rr_number     TEXT,
+  sector_head   TEXT,
+  region        TEXT,
+  global_practice TEXT,
+  service_line  TEXT,
+  vertical      TEXT,
+  delivery_director TEXT,
+  delivery_manager  TEXT,
+  hiring_manager    TEXT,
+  account       TEXT,
+  project       TEXT,
+  kimble_id     TEXT,
+  request_type  TEXT,
+  backup_rr     TEXT,
+  primary_skill TEXT,
+  skill_combo   TEXT,
+  role_desc     TEXT,
+  seniority     TEXT,
+  req_rec_date  DATE,
+  client_billing DATE,
+  agreed_billing DATE,
+  lead_time     TEXT,
+  status        TEXT,
+  status_prog   TEXT,
+  closed_date   DATE,
+  on_hold_date  DATE,
+  cancelled_date DATE,
+  lost_date     DATE,
+  target_date   DATE,
+  tagged_to     TEXT,
+  on_hold_remarks TEXT,
+  remarks       TEXT,
+  fulfilled_by  TEXT,
+  contract_type TEXT,
+  working_hours TEXT,
+  max_grade     TEXT,
+  ta_contact    TEXT,
+  ageing        INTEGER,
+  rag_status    TEXT,
+  p_recv        INTEGER,
+  p_short       INTEGER,
+  l1_sel        INTEGER,
+  l1_pend       INTEGER,
+  l2_scr        INTEGER,
+  l2_sel        INTEGER,
+  l2_pend       INTEGER,
+  cl_sel        INTEGER,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);</pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-sec" onclick="closeCfgModal()">Cancel</button>
+      <button class="btn btn-pri" onclick="saveCfg()">Save &amp; Reconnect</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  CONFIGURATION  — replace these with your real values
+//  or use the Configure DB button in the top bar
+// ══════════════════════════════════════════════════════
+const DEFAULT_URL = 'https://hmrvexecggbrxwjvigpj.supabase.co';
+const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhtcnZleGVjZ2dicnh3anZpZ3BqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMjE4MTQsImV4cCI6MjA5Mzg5NzgxNH0.kDn74I8yEM_fy4CwyVmKj99ufwkcz0AS_I9Dr0ieso4';
+const TABLE       = 'rr_tracker';
+const IS_PLACEHOLDER = DEFAULT_KEY === 'YOUR_SUPABASE_ANON_KEY';
+
+// ── Runtime config (can be overridden via Configure DB modal) ──
+let SUPA_URL = localStorage.getItem('sb_url') || DEFAULT_URL;
+let SUPA_KEY = localStorage.getItem('sb_key') || DEFAULT_KEY;
+
+// ── In-memory record store ──
+let records  = [];
+let editingId = null;   // Supabase row id being edited (null = new record)
+
+// ══ SUPABASE REST HELPERS ══════════════════════════
+function sbHeaders() {
+  return {
+    'Content-Type':  'application/json',
+    'apikey':        SUPA_KEY,
+    'Authorization': `Bearer ${SUPA_KEY}`,
+    'Prefer':        'return=representation',
+  };
+}
+
+async function sbFetch(path, opts = {}) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+    headers: sbHeaders(),
+    ...opts,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Supabase error ${res.status}: ${err}`);
+  }
+  // 204 No Content
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// SELECT * FROM rr_tracker ORDER BY id DESC
+async function dbSelect() {
+  return sbFetch(`${TABLE}?order=id.asc&limit=2000`);
+}
+
+// INSERT one row
+async function dbInsert(row) {
+  return sbFetch(TABLE, { method: 'POST', body: JSON.stringify(row) });
+}
+
+// UPDATE row by id
+async function dbUpdate(id, row) {
+  return sbFetch(`${TABLE}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(row) });
+}
+
+// DELETE row by id
+async function dbDelete(id) {
+  return sbFetch(`${TABLE}?id=eq.${id}`, { method: 'DELETE' });
+}
+
+// ══ CONNECTION TEST ════════════════════════════════
+async function testConnection() {
+  setConn('loading', 'Connecting…');
+  try {
+    await sbFetch(`${TABLE}?limit=1`);
+    setConn('ok', 'Connected to Supabase');
+    return true;
+  } catch (e) {
+    setConn('error', 'DB not connected');
+    return false;
+  }
+}
+
+function setConn(state, label) {
+  const dot = document.getElementById('connDot');
+  const lbl = document.getElementById('connLabel');
+  dot.className = 'dot' + (state === 'ok' ? ' ok' : state === 'loading' ? ' loading' : '');
+  lbl.textContent = label;
+}
+
+// ══ LOAD RECORDS ═══════════════════════════════════
+async function loadRecords() {
+  showLoader('Loading records…');
+  try {
+    const data = await dbSelect();
+    records = data || [];
+    updateBadge();
+    updateStats();
+    renderTable();
+    document.getElementById('lastRefresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    toast('Failed to load records: ' + e.message, 'error');
+  } finally {
+    hideLoader();
+  }
+}
+
+// ══ SAVE RECORD (INSERT or UPDATE) ════════════════
+async function saveRecord() {
+  if (!valAll()) { toast('Please fill all required fields', 'error'); return; }
+  const row = collectForm();
+  showLoader(editingId ? 'Updating record…' : 'Saving new record…');
+  try {
+    if (editingId) {
+      await dbUpdate(editingId, row);
+      toast(`RR ${row.rr_number} updated successfully`, 'success');
+    } else {
+      await dbInsert(row);
+      toast(`RR ${row.rr_number} added successfully`, 'success');
+    }
+    resetForm();
+    await loadRecords();
+    switchTab('records');
+  } catch (e) {
+    toast('Save failed: ' + e.message, 'error');
+  } finally {
+    hideLoader();
+  }
+}
+
+// ══ DELETE ════════════════════════════════════════
+async function deleteRec(id, rrNum) {
+  if (!confirm(`Delete RR ${rrNum}?\nThis will permanently remove it from the database.`)) return;
+  showLoader('Deleting…');
+  try {
+    await dbDelete(id);
+    toast(`RR ${rrNum} deleted`, 'info');
+    await loadRecords();
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'error');
+  } finally {
+    hideLoader();
+  }
+}
+
+// ══ EDIT ══════════════════════════════════════════
+function editRec(id) {
+  const rec = records.find(r => r.id === id);
+  if (!rec) return;
+  editingId = id;
+  fillForm(rec);
+  document.getElementById('formTitle').textContent = `Editing RR ${rec.rr_number}`;
+  document.getElementById('formSub').textContent   = `Changes will be saved to the database`;
+  document.getElementById('btnSaveRec').innerHTML  =
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Update Record';
+  switchTab('new');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ══ FORM → DB ROW ════════════════════════════════
+function g(id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; }
+function gn(id) { const v = g(id); return v !== '' ? Number(v) : null; }
+function gd(id) { const v = g(id); return v || null; }
+
+function collectForm() {
+  const iso     = gd('reqRecDate');
+  const status  = g('status');
+  return {
+    rr_number:         g('rrNum'),
+    sector_head:       g('sectorHead'),
+    region:            g('region'),
+    global_practice:   g('globalPractice'),
+    service_line:      g('serviceLine'),
+    vertical:          g('vertical'),
+    delivery_director: g('deliveryDirector'),
+    delivery_manager:  g('deliveryManager'),
+    hiring_manager:    g('hiringManager'),
+    account:           g('account'),
+    project:           g('project'),
+    kimble_id:         g('kimbleId'),
+    request_type:      g('requestType'),
+    backup_rr:         g('backupRR'),
+    primary_skill:     g('primarySkill'),
+    skill_combo:       g('skillCombo'),
+    role_desc:         g('roleDesc'),
+    seniority:         g('seniorityLevel'),
+    req_rec_date:      iso,
+    client_billing:    gd('clientBilling'),
+    agreed_billing:    gd('agreedBilling'),
+    lead_time:         g('leadTime'),
+    status:            status,
+    status_prog:       g('statusProg'),
+    closed_date:       gd('closedDate'),
+    on_hold_date:      gd('onHoldDate'),
+    cancelled_date:    gd('cancelledDate'),
+    lost_date:         gd('lostDate'),
+    target_date:       gd('targetDate'),
+    tagged_to:         g('taggedTo'),
+    on_hold_remarks:   g('onHoldRemarks'),
+    remarks:           g('remarks'),
+    fulfilled_by:      g('fulfilledBy'),
+    contract_type:     g('contractType'),
+    working_hours:     g('workingHours'),
+    max_grade:         g('maxGrade'),
+    ta_contact:        g('taContact'),
+    ageing:            calcAge(iso, status),
+    rag_status:        calcRAG(iso, status),
+    p_recv:            gn('pRecv'),
+    p_short:           gn('pShort'),
+    l1_sel:            gn('l1Sel'),
+    l1_pend:           gn('l1Pend'),
+    l2_scr:            gn('l2Scr'),
+    l2_sel:            gn('l2Sel'),
+    l2_pend:           gn('l2Pend'),
+    cl_sel:            gn('clSel'),
+    updated_at:        new Date().toISOString(),
+  };
+}
+
+// ══ DB ROW → FORM ════════════════════════════════
+function sv(id, val) { const e = document.getElementById(id); if (e) e.value = val ?? ''; }
+function fillForm(r) {
+  sv('rrNum',           r.rr_number);     sv('sectorHead',      r.sector_head);
+  sv('region',          r.region);        sv('globalPractice',  r.global_practice);
+  sv('serviceLine',     r.service_line);  sv('vertical',        r.vertical);
+  sv('deliveryDirector',r.delivery_director); sv('deliveryManager', r.delivery_manager);
+  sv('hiringManager',   r.hiring_manager);sv('account',         r.account);
+  sv('project',         r.project);       sv('kimbleId',        r.kimble_id);
+  sv('requestType',     r.request_type);  sv('backupRR',        r.backup_rr);
+  sv('primarySkill',    r.primary_skill); sv('skillCombo',      r.skill_combo);
+  sv('roleDesc',        r.role_desc);     sv('seniorityLevel',  r.seniority);
+  sv('reqRecDate',      r.req_rec_date);  sv('clientBilling',   r.client_billing);
+  sv('agreedBilling',   r.agreed_billing);sv('leadTime',        r.lead_time);
+  sv('status',          r.status);        sv('statusProg',      r.status_prog);
+  sv('closedDate',      r.closed_date);   sv('onHoldDate',      r.on_hold_date);
+  sv('cancelledDate',   r.cancelled_date);sv('lostDate',        r.lost_date);
+  sv('targetDate',      r.target_date);   sv('taggedTo',        r.tagged_to);
+  sv('onHoldRemarks',   r.on_hold_remarks);sv('remarks',        r.remarks);
+  sv('fulfilledBy',     r.fulfilled_by);  sv('contractType',    r.contract_type);
+  sv('workingHours',    r.working_hours); sv('maxGrade',        r.max_grade);
+  sv('taContact',       r.ta_contact);
+  sv('pRecv',  r.p_recv);  sv('pShort', r.p_short);
+  sv('l1Sel',  r.l1_sel);  sv('l1Pend', r.l1_pend);
+  sv('l2Scr',  r.l2_scr);  sv('l2Sel',  r.l2_sel);
+  sv('l2Pend', r.l2_pend); sv('clSel',  r.cl_sel);
+  toggleDates();
+}
+
+// ══ RESET FORM ════════════════════════════════════
+function resetForm() {
+  editingId = null;
+  document.getElementById('formTitle').textContent = 'New Resource Requirement';
+  document.getElementById('formSub').textContent   = 'Fields marked * are required';
+  document.getElementById('btnSaveRec').innerHTML  =
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Record';
+  document.querySelectorAll('#view-new input,#view-new select,#view-new textarea')
+    .forEach(e => { e.value = ''; e.classList.remove('err'); });
+  document.querySelectorAll('#view-new .field').forEach(f => f.classList.remove('bad'));
+  toggleDates();
+}
+
+// ══ RENDER TABLE ══════════════════════════════════
+function renderTable() {
+  const srch = (document.getElementById('srch')?.value || '').toLowerCase();
+  const fS   = document.getElementById('fSt')?.value  || '';
+  const fR   = document.getElementById('fRg')?.value  || '';
+  const fV   = document.getElementById('fVt')?.value  || '';
+  const fG   = document.getElementById('fRag')?.value || '';
+
+  const tbody = document.getElementById('tblBody');
+  const ep    = document.getElementById('emptyPl');
+  tbody.innerHTML = '';
+
+  const filt = records.filter(r => {
+    const rag = r.rag_status || calcRAG(r.req_rec_date, r.status);
+    return (
+      (!srch || [r.rr_number,r.account,r.role_desc,r.primary_skill,r.sector_head,r.project,r.status_prog].join(' ').toLowerCase().includes(srch)) &&
+      (!fS || r.status === fS) &&
+      (!fR || r.region === fR) &&
+      (!fV || r.vertical === fV) &&
+      (!fG || rag === fG)
+    );
+  });
+
+  if (!filt.length) { ep.style.display = 'block'; return; }
+  ep.style.display = 'none';
+
+  filt.forEach(r => {
+    const rag  = r.rag_status || calcRAG(r.req_rec_date, r.status);
+    const age  = r.ageing ?? calcAge(r.req_rec_date, r.status);
+    const sk   = (r.status||'').replace('-','').replace(' ','');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="rr-num">${r.rr_number||'—'}</span></td>
+      <td><strong>${r.account||'—'}</strong><br><span style="color:var(--text-muted);font-size:11px">${r.region||''}</span></td>
+      <td>${r.role_desc||'—'}</td>
+      <td>${r.primary_skill||'—'}</td>
+      <td><span style="background:var(--bg);padding:2px 8px;border-radius:4px;font-size:11px">${r.seniority||'—'}</span></td>
+      <td>${r.region||'—'}</td>
+      <td>${r.vertical||'—'}</td>
+      <td><span class="sb s${sk}">${r.status||'—'}</span></td>
+      <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px;color:var(--text-secondary)">${r.status_prog||'—'}</td>
+      <td>${rag ? `<span class="rag-badge r-${rag}"><span class="rdot"></span>${rag}</span>` : '—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:13px">${age !== null && age !== '' ? age : '—'}</td>
+      <td><div class="act-btns">
+        <button class="ico-btn" onclick="editRec(${r.id})" title="Edit">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="ico-btn del" onclick="deleteRec(${r.id},'${r.rr_number}')" title="Delete">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        </button>
+      </div></td>`;
+    tbody.appendChild(tr);
+  });
+  updateStats();
+}
+
+// ══ STATS ═════════════════════════════════════════
+function updateStats() {
+  document.getElementById('st0').textContent = records.length;
+  document.getElementById('st1').textContent = records.filter(r => r.status === 'Open').length;
+  document.getElementById('st2').textContent = records.filter(r => r.status === 'On-hold').length;
+  document.getElementById('st3').textContent = records.filter(r => r.status === 'Closed').length;
+  document.getElementById('st4').textContent = records.filter(r => (r.rag_status || calcRAG(r.req_rec_date, r.status)) === 'RED').length;
+}
+function updateBadge() { document.getElementById('recCount').textContent = records.length; }
+
+// ══ CALCULATED FIELDS ═════════════════════════════
+function calcAge(iso, st) {
+  if (!iso || st === 'Closed' || st === 'Cancelled') return null;
+  try { const d = Math.floor((Date.now() - new Date(iso)) / 86400000); return d >= 0 ? d : null; } catch { return null; }
+}
+function calcRAG(iso, st) {
+  if (!iso || st === 'Closed' || st === 'Cancelled' || st === 'Lost') return '';
+  try { const d = Math.floor((Date.now() - new Date(iso)) / 86400000); return d >= 20 ? 'RED' : d >= 10 ? 'AMBER' : 'GREEN'; } catch { return ''; }
+}
+
+// ══ VALIDATION ════════════════════════════════════
+const REQF = ['region','sectorHead','serviceLine','vertical','account','rrNum','requestType','primarySkill','seniorityLevel','roleDesc','reqRecDate','leadTime','status'];
+function fv(el) {
+  const ok = !!el.value.trim();
+  el.closest('.field').classList.toggle('bad', !ok);
+  el.classList.toggle('err', !ok);
+  return ok;
+}
+function valAll() { let ok = true; REQF.forEach(id => { const e = document.getElementById(id); if (e && !fv(e)) ok = false; }); return ok; }
+
+// ══ DATE TOGGLES ══════════════════════════════════
+function toggleDates() {
+  const st = document.getElementById('status').value;
+  ['w-closed','w-hold','w-cancel','w-lost'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+  if (st === 'Closed')    document.getElementById('w-closed')?.classList.remove('hidden');
+  if (st === 'On-hold')   document.getElementById('w-hold')?.classList.remove('hidden');
+  if (st === 'Cancelled') document.getElementById('w-cancel')?.classList.remove('hidden');
+  if (st === 'Lost')      document.getElementById('w-lost')?.classList.remove('hidden');
+}
+
+// ══ EXPORT EXCEL ══════════════════════════════════
+function exportExcel() {
+  if (!records.length) { toast('No records to export', 'info'); return; }
+  const headers = ['ID','RR #','Account','Project','Role','Skill','Seniority','Region','Vertical','Service Line','Sector Head','Status','Status Progress','RAG','Ageing','Request Received','Client Billing','Agreed Billing','Lead Time','Fulfilled By','Contract','Working Hrs','Max Grade','Tagged To','TA Contact','Closed Date','On Hold Date','Cancelled Date','Lost Date','Target Date','On Hold Remarks','Remarks','Profiles Received','Profiles Shortlisted','L1 Selects','L1 Pending','L2 Screening','L2 Selects','L2 Pending','Client Selects','Created At'];
+  const rows = records.map(r => [
+    r.id, r.rr_number, r.account, r.project, r.role_desc, r.primary_skill, r.seniority,
+    r.region, r.vertical, r.service_line, r.sector_head, r.status, r.status_prog,
+    r.rag_status || calcRAG(r.req_rec_date, r.status),
+    r.ageing ?? calcAge(r.req_rec_date, r.status),
+    r.req_rec_date, r.client_billing, r.agreed_billing, r.lead_time, r.fulfilled_by,
+    r.contract_type, r.working_hours, r.max_grade, r.tagged_to, r.ta_contact,
+    r.closed_date, r.on_hold_date, r.cancelled_date, r.lost_date, r.target_date,
+    r.on_hold_remarks, r.remarks,
+    r.p_recv, r.p_short, r.l1_sel, r.l1_pend, r.l2_scr, r.l2_sel, r.l2_pend, r.cl_sel,
+    r.created_at
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 14) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Raw Data');
+  XLSX.writeFile(wb, `NTT_DATA_RR_Tracker_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Excel exported', 'success');
+}
+
+// ══ CONFIG MODAL ══════════════════════════════════
+function openCfgModal() {
+  document.getElementById('cfgUrl').value = SUPA_URL !== DEFAULT_URL ? SUPA_URL : '';
+  document.getElementById('cfgKey').value = SUPA_KEY !== DEFAULT_KEY ? SUPA_KEY : '';
+  document.getElementById('cfgModal').classList.add('open');
+}
+function closeCfgModal() { document.getElementById('cfgModal').classList.remove('open'); }
+async function saveCfg() {
+  const url = document.getElementById('cfgUrl').value.trim();
+  const key = document.getElementById('cfgKey').value.trim();
+  if (!url || !key) { toast('Both URL and key are required', 'error'); return; }
+  SUPA_URL = url; SUPA_KEY = key;
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  closeCfgModal();
+  document.getElementById('cfgBanner').style.display = 'none';
+  const ok = await testConnection();
+  if (ok) { toast('Connected successfully!', 'success'); loadRecords(); }
+  else toast('Connection failed — check your URL and key', 'error');
+}
+
+// ══ TAB SWITCH ════════════════════════════════════
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('tab-' + t).classList.add('active');
+  document.getElementById('view-' + t).classList.add('active');
+  if (t === 'records') { renderTable(); updateStats(); }
+}
+
+// ══ LOADER ════════════════════════════════════════
+function showLoader(txt) { document.getElementById('loaderTxt').textContent = txt; document.getElementById('loader').classList.add('show'); }
+function hideLoader()    { document.getElementById('loader').classList.remove('show'); }
+
+// ══ TOAST ═════════════════════════════════════════
+function toast(msg, type = 'info') {
+  const w = document.getElementById('toastWrap');
+  const icons = { success:'✅', error:'❌', info:'ℹ️', warn:'⚠️' };
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span>${icons[type]||'•'}</span><span>${msg}</span>`;
+  w.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 300); }, 4000);
+}
+
+// ══ AUTO-REFRESH every 60 seconds ════════════════
+setInterval(() => {
+  if (document.getElementById('view-records').classList.contains('active')) loadRecords();
+}, 60000);
+
+// ══ INIT ══════════════════════════════════════════
+(async () => {
+  toggleDates();
+
+  // Hide config banner if real credentials are set in localStorage
+  const storedUrl = localStorage.getItem('sb_url');
+  if (storedUrl && storedUrl !== DEFAULT_URL) {
+    document.getElementById('cfgBanner').style.display = 'none';
+  }
+
+  if (IS_PLACEHOLDER && !storedUrl) {
+    // No real credentials yet — show UI in demo mode
+    setConn('error', 'Not configured');
+    toast('Configure your Supabase connection to get started', 'warn');
+    return;
+  }
+
+  const ok = await testConnection();
+  if (ok) {
+    await loadRecords();
+    // Start on records tab if data exists
+    if (records.length > 0) switchTab('records');
+  }
+})();
+</script>
+</body>
+</html>
